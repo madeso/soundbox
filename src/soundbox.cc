@@ -5,36 +5,6 @@
 #include <unordered_map>
 #include <functional>
 
-// todo(Gustav): for replacing later
-// .i[0] osc1_waveform
-// .i[1] osc1_vol
-// .i[2] osc1_semi
-// .i[3] osc1_xenv
-// .i[4] osc2_waveform
-// .i[5] osc2_vol
-// .i[6] osc2_semi
-// .i[7] osc2_detune
-// .i[8] osc2_xenv
-// .i[9] noise_vol
-// .i[10] env_attack
-// .i[11] env_sustain
-// .i[12] env_release
-// .i[13] env_exp_decay
-// .i[14] arp_chord
-// .i[15] arp_speed
-// .i[16] lfo_waveform
-// .i[17] lfo_amt
-// .i[18] lfo_freq
-// .i[19] lfo_fx_freq
-// .i[20] fx_filter
-// .i[21] fx_freq
-// .i[22] fx_resonance
-// .i[23] fx_dist
-// .i[24] fx_drive
-// .i[25] fx_pan_amt
-// .i[27] fx_pan_freq
-// .i[27] fx_delay_amt
-// .i[28] fx_delay_time
 
 namespace
 {
@@ -131,20 +101,20 @@ namespace
 
     std::vector<i32> createNote(const Instrument& instr, int n, int rowLen, Player::RandomEngine* random_engine)
     {
-        auto osc1 = [&](float f) { return mOscillators(instr.i[0], f); };
-        auto o1vol = instr.i[1];
-        auto o1xenv = instr.i[3] / 32;
-        auto osc2 = [&](float f) { return mOscillators(instr.i[4], f); };
-        auto o2vol = instr.i[5];
-        auto o2xenv = instr.i[8] / 32;
-        auto noiseVol = instr.i[9];
-        auto attack = instr.i[10] * instr.i[10] * 4;
-        auto sustain = instr.i[11] * instr.i[11] * 4;
-        auto release = instr.i[12] * instr.i[12] * 4;
+        auto osc1 = [&](float f) { return mOscillators(instr.i[OSC1_WAVEFORM], f); };
+        auto o1vol = instr.i[OSC1_VOL];
+        auto o1xenv = instr.i[OSC1_XENV] / 32;
+        auto osc2 = [&](float f) { return mOscillators(instr.i[OSC2_WAVEFORM], f); };
+        auto o2vol = instr.i[OSC2_VOL];
+        auto o2xenv = instr.i[OSC2_XENV] / 32;
+        auto noiseVol = instr.i[NOISE_VOL];
+        auto attack = instr.i[ENV_ATTACK] * instr.i[ENV_ATTACK] * 4;
+        auto sustain = instr.i[ENV_SUSTAIN] * instr.i[ENV_SUSTAIN] * 4;
+        auto release = instr.i[ENV_RELEASE] * instr.i[ENV_RELEASE] * 4;
         auto releaseInv = 1 / release;
-        auto expDecay = -instr.i[13] / 16;
-        auto arp = instr.i[14];
-        auto arpInterval = rowLen * std::pow(2, (2 - instr.i[15]));
+        auto expDecay = -instr.i[ENV_EXP_DECAY] / 16;
+        auto arp = instr.i[ARP_CHORD];
+        auto arpInterval = rowLen * std::pow(2, (2 - instr.i[ARP_SPEED]));
 
         auto noteBuf = std::vector<i32>(attack + sustain + release);
 
@@ -162,8 +132,8 @@ namespace
                 j2 -= arpInterval;
 
                 // Calculate note frequencies for the oscillators
-                o1t = getnotefreq(n + (arp & 15) + instr.i[2] - 128);
-                o2t = getnotefreq(n + (arp & 15) + instr.i[6] - 128) * (1 + 0.0008 * instr.i[7]);
+                o1t = getnotefreq(n + (arp & 15) + instr.i[OSC1_SEMI] - 128);
+                o2t = getnotefreq(n + (arp & 15) + instr.i[OSC2_SEMI] - 128) * (1 + 0.0008 * instr.i[OSC2_DETUNE]);
             }
 
             // Envelope
@@ -264,19 +234,19 @@ float Player::generate()
             }
 
             // Put performance critical instrument properties in local variables
-            auto oscLFO = [&](float f) { return mOscillators(instr.i[16], f); };
-            auto lfoAmt = instr.i[17] / 512;
-            auto lfoFreq = std::pow(2, (instr.i[18] - 9)) / rowLen;
-            auto fxLFO = instr.i[19];
-            auto fxFilter = instr.i[20];
-            auto fxFreq = instr.i[21] * 43.23529 * 3.141592 / 44100;
-            auto q = 1 - instr.i[22] / 255;
-            auto dist = instr.i[23] * 1e-5;
-            auto drive = instr.i[24] / 32;
-            auto panAmt = instr.i[25] / 512;
-            auto panFreq = 6.283184 * std::pow(2, (instr.i[26] - 9)) / rowLen;
-            auto dlyAmt = instr.i[27] / 255;
-            auto dly = instr.i[28] * rowLen & ~1;  // Must be an even number
+            auto oscLFO = [&](float f) { return mOscillators(instr.i[LFO_WAVEFORM], f); };
+            auto lfoAmt = instr.i[LFO_AMT] / 512;
+            auto lfoFreq = std::pow(2, (instr.i[LFO_FREQ] - 9)) / rowLen;
+            auto fxLFO = instr.i[LFO_FX_FREQ];
+            auto fxFilter = instr.i[FX_FILTER];
+            auto fxFreq = instr.i[FX_FREQ] * 43.23529 * 3.141592 / 44100;
+            auto q = 1 - instr.i[FX_RESONANCE] / 255;
+            auto dist = instr.i[FX_DIST] * 1e-5;
+            auto drive = instr.i[FX_DRIVE] / 32;
+            auto panAmt = instr.i[FX_PAN_AMT] / 512;
+            auto panFreq = 6.283184 * std::pow(2, (instr.i[FX_PAN_FREQ] - 9)) / rowLen;
+            auto dlyAmt = instr.i[FX_DELAY_AMT] / 255;
+            auto dly = instr.i[FX_DELAY_TIME] * rowLen & ~1;  // Must be an even number
 
             // Calculate start sample number for this row in the pattern
             rowStartSample = (p * patternLen + row) * rowLen;

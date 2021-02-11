@@ -2,6 +2,7 @@
 
 
 #include <vector>
+#include <array>
 #include <random>
 #include <optional>
 
@@ -14,40 +15,43 @@ struct Column
     std::vector<std::optional<int>> f;
 };
 
+enum
+{
+    OSC1_WAVEFORM,
+    OSC1_VOL,
+    OSC1_SEMI,
+    OSC1_XENV,
+    OSC2_WAVEFORM,
+    OSC2_VOL,
+    OSC2_SEMI,
+    OSC2_DETUNE,
+    OSC2_XENV,
+    NOISE_VOL,
+    ENV_ATTACK,
+    ENV_SUSTAIN,
+    ENV_RELEASE,
+    ENV_EXP_DECAY,
+    ARP_CHORD,
+    ARP_SPEED,
+    LFO_WAVEFORM,
+    LFO_AMT,
+    LFO_FREQ,
+    LFO_FX_FREQ,
+    FX_FILTER,
+    FX_FREQ,
+    FX_RESONANCE,
+    FX_DIST,
+    FX_DRIVE,
+    FX_PAN_AMT,
+    FX_PAN_FREQ,
+    FX_DELAY_AMT,
+    FX_DELAY_TIME,
+    INSTUMENT_DATA_COUNT
+};
+
 struct Instrument
 {
-    std::vector<int> i;
-
-    // todo(Gustav): for replacing later
-    // int osc1_waveform;
-    // int osc1_vol;
-    // int osc1_semi;
-    // int osc1_xenv;
-    // int osc2_waveform;
-    // int osc2_vol;
-    // int osc2_semi;
-    // int osc2_detune;
-    // int osc2_xenv;
-    // int noise_vol;
-    // int env_attack;
-    // int env_sustain;
-    // int env_release;
-    // int env_exp_decay;
-    // int arp_chord;
-    // int arp_speed;
-    // int lfo_waveform;
-    // int lfo_amt;
-    // int lfo_freq;
-    // int lfo_fx_freq;
-    // int fx_filter;
-    // int fx_freq;
-    // int fx_resonance;
-    // int fx_dist;
-    // int fx_drive;
-    // int fx_pan_amt;
-    // int fx_pan_freq;
-    // int fx_delay_amt;
-    // int fx_delay_time;
+    std::array<int, INSTUMENT_DATA_COUNT> i;
 
     std::vector<std::optional<int>> p;    // Patterns
     std::vector<Column> c; // Columns
