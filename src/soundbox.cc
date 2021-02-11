@@ -23,19 +23,45 @@ namespace
         }
     }
 
+
     float d2f(double d)
     {
         return static_cast<float>(d);
     }
 
+
+    auto generate_seed()
+    {
+        std::random_device device;
+        return device();
+    }
+
+
+    float generate_random(Player::RandomEngine* random_engine)
+    {
+        auto distribution = std::uniform_real_distribution<float>{ 0.0f, 1.0f };
+        return distribution(*random_engine);
+    }
+
+    i32 truncate(float f)
+    {
+        return static_cast<i32>(std::floor(f));
+    }
+}
+
+
+namespace
+{
     //--------------------------------------------------------------------------
     // Private methods
     //--------------------------------------------------------------------------
+
 
     float frac(float f)
     {
         return f - std::trunc(f);
     }
+
 
     // Oscillators
     float osc_sin(float value)
@@ -43,15 +69,18 @@ namespace
         return d2f(std::sin(value * 6.283184));
     };
 
+
     float osc_saw(float value)
     {
         return 2 * frac(value) - 1;
     };
 
+
     float osc_square(float value)
     {
         return frac(value) < 0.5 ? 1.0f : -1.0f;
     };
+
 
     float osc_tri(float value)
     {
@@ -59,6 +88,7 @@ namespace
         if (v2 < 2) return v2 - 1;
         return 3 - v2;
     };
+
 
     // Array of oscillator functions
     float mOscillators(int oscilator_type, float value)
@@ -73,56 +103,40 @@ namespace
         }
     };
 
-    auto getnotefreq(float n)
+
+    float getnotefreq(float n)
     {
         // 174.61.. / 44100 = 0.003959503758 (F3)
-        return 0.003959503758 * std::pow(2, (n - 128) / 12);
+        return 0.003959503758f * std::pow(2.0f, (n - 128) / 12.0f);
     };
 
-
-    //--------------------------------------------------------------------------
-    // Private members
-    //--------------------------------------------------------------------------
-
-    // Private variables set up by init()
-    // auto mSong, mLastRow, mCurrentCol, mNumWords, mMixBuf;
-
-    auto generate_seed()
-    {
-        std::random_device device;
-        return device();
-    }
-
-    float generate_random(Player::RandomEngine* random_engine)
-    {
-        auto distribution = std::uniform_real_distribution<float>{0.0f, 1.0f};
-        return distribution(*random_engine);
-    }
 
     std::vector<i32> createNote(const Instrument& instr, int n, int rowLen, Player::RandomEngine* random_engine)
     {
         auto osc1 = [&](float f) { return mOscillators(instr.i[OSC1_WAVEFORM], f); };
         auto o1vol = instr.i[OSC1_VOL];
-        auto o1xenv = instr.i[OSC1_XENV] / 32;
+        auto o1xenv = instr.i[OSC1_XENV] / 32.0f;
         auto osc2 = [&](float f) { return mOscillators(instr.i[OSC2_WAVEFORM], f); };
         auto o2vol = instr.i[OSC2_VOL];
-        auto o2xenv = instr.i[OSC2_XENV] / 32;
+        auto o2xenv = instr.i[OSC2_XENV] / 32.0f;
         auto noiseVol = instr.i[NOISE_VOL];
         auto attack = instr.i[ENV_ATTACK] * instr.i[ENV_ATTACK] * 4;
         auto sustain = instr.i[ENV_SUSTAIN] * instr.i[ENV_SUSTAIN] * 4;
         auto release = instr.i[ENV_RELEASE] * instr.i[ENV_RELEASE] * 4;
-        auto releaseInv = 1 / release;
-        auto expDecay = -instr.i[ENV_EXP_DECAY] / 16;
+        auto releaseInv = 1.0f / release;
+        auto expDecay = -instr.i[ENV_EXP_DECAY] / 16.0f;
         auto arp = instr.i[ARP_CHORD];
         auto arpInterval = rowLen * std::pow(2, (2 - instr.i[ARP_SPEED]));
 
         auto noteBuf = std::vector<i32>(attack + sustain + release);
 
         // Re-trig oscillators
-        int c1 = 0, c2 = 0;
+        float c1 = 0, c2 = 0;
 
         // Local variables.
-        int j, j2, e, t, rsample, o1t, o2t;
+        int j, j2;
+        float o1t, o2t;
+        float e, rsample;
 
         // Generate one note (attack + sustain + release)
         for (j = 0, j2 = 0; j < attack + sustain + release; j++, j2++) {
@@ -133,17 +147,17 @@ namespace
 
                 // Calculate note frequencies for the oscillators
                 o1t = getnotefreq(n + (arp & 15) + instr.i[OSC1_SEMI] - 128);
-                o2t = getnotefreq(n + (arp & 15) + instr.i[OSC2_SEMI] - 128) * (1 + 0.0008 * instr.i[OSC2_DETUNE]);
+                o2t = getnotefreq(n + (arp & 15) + instr.i[OSC2_SEMI] - 128) * (1.0f + 0.0008f * instr.i[OSC2_DETUNE]);
             }
 
             // Envelope
             e = 1;
             if (j < attack) {
-                e = j / attack;
+                e = static_cast<float>(j) / attack;
             }
             else if (j >= attack + sustain) {
                 e = (j - attack - sustain) * releaseInv;
-                e = (1 - e) * std::pow(3, (expDecay * e));
+                e = (1 - e) * std::pow(3.0f, (expDecay * e));
             }
 
             // Oscillator 1
@@ -160,7 +174,7 @@ namespace
             }
 
             // Add to (mono) channel buffer
-            noteBuf[j] = (80 * rsample * e) | 0;
+            noteBuf[j] = truncate(80 * rsample * e);
         }
 
         return noteBuf;
@@ -200,7 +214,9 @@ float Player::generate()
     // Local variables
     std::optional<int> n;
     int i, j, b, p, row, col,
-        k, t, lfor, e, x, rsample, rowStartSample, f, da;
+        k, t, lfor, e, x, rowStartSample, da;
+
+    float f;
 
     // Put performance critical items in local variables
     auto chnBuf = std::vector<i32>(mNumWords);
@@ -209,8 +225,9 @@ float Player::generate()
     int patternLen = mSong.patternLen;
 
     // Clear effect state
-    int low = 0, band = 0, high;
-    int lsample;
+    float low = 0, band = 0, high;
+    float lsample;
+    float rsample;
     bool filterActive = false;
 
     // Clear note cache.
@@ -218,7 +235,7 @@ float Player::generate()
 
     // Patterns
     for (p = 0; p <= mLastRow; ++p) {
-        auto cp = instr.p[p];
+        auto& cp = instr.p[p];
 
         // Pattern rows
         for (row = 0; row < patternLen; ++row) {
@@ -235,17 +252,18 @@ float Player::generate()
 
             // Put performance critical instrument properties in local variables
             auto oscLFO = [&](float f) { return mOscillators(instr.i[LFO_WAVEFORM], f); };
-            auto lfoAmt = instr.i[LFO_AMT] / 512;
-            auto lfoFreq = std::pow(2, (instr.i[LFO_FREQ] - 9)) / rowLen;
+            auto lfoAmt = instr.i[LFO_AMT] / 512.0f;
+            auto lfoFreq = std::pow(2.0f, (instr.i[LFO_FREQ] - 9)) / rowLen;
             auto fxLFO = instr.i[LFO_FX_FREQ];
             auto fxFilter = instr.i[FX_FILTER];
-            auto fxFreq = instr.i[FX_FREQ] * 43.23529 * 3.141592 / 44100;
-            auto q = 1 - instr.i[FX_RESONANCE] / 255;
-            auto dist = instr.i[FX_DIST] * 1e-5;
-            auto drive = instr.i[FX_DRIVE] / 32;
-            auto panAmt = instr.i[FX_PAN_AMT] / 512;
-            auto panFreq = 6.283184 * std::pow(2, (instr.i[FX_PAN_FREQ] - 9)) / rowLen;
-            auto dlyAmt = instr.i[FX_DELAY_AMT] / 255;
+            auto fxFreq = instr.i[FX_FREQ] * 43.23529f * 3.141592f / 44100.0f;
+            auto q = 1 - instr.i[FX_RESONANCE] / 255.0f;
+            auto has_dist = instr.i[FX_DIST] != 0;
+            auto dist = instr.i[FX_DIST] * 1e-5f;
+            auto drive = instr.i[FX_DRIVE] / 32.0f;
+            auto panAmt = instr.i[FX_PAN_AMT] / 512.0f;
+            auto panFreq = 6.283184f * std::pow(2, (instr.i[FX_PAN_FREQ] - 9)) / rowLen;
+            auto dlyAmt = instr.i[FX_DELAY_AMT] / 255.0f;
             auto dly = instr.i[FX_DELAY_TIME] * rowLen & ~1;  // Must be an even number
 
             // Calculate start sample number for this row in the pattern
@@ -269,11 +287,11 @@ float Player::generate()
                 rsample = chnBuf[k];
 
                 // We only do effects if we have some sound input
-                if (rsample || filterActive) {
+                if (chnBuf[k] != 0 || filterActive) {
                     // State variable filter
                     f = fxFreq;
                     if (fxLFO) {
-                        f *= oscLFO(lfoFreq * k) * lfoAmt + 0.5;
+                        f *= oscLFO(lfoFreq * k) * lfoAmt + 0.5f;
                     }
                     f = 1.5 * std::sin(f);
                     low += f * band;
@@ -282,7 +300,7 @@ float Player::generate()
                     rsample = fxFilter == 3 ? band : fxFilter == 1 ? high : low;
 
                     // Distortion
-                    if (dist) {
+                    if (has_dist) {
                         rsample *= dist;
                         rsample = rsample < 1 ? rsample > -1 ? osc_sin(rsample*.25) : -1 : 1;
                         rsample /= dist;
@@ -292,7 +310,7 @@ float Player::generate()
                     rsample *= drive;
 
                     // Is the filter active (i.e. still audiable)?
-                    filterActive = rsample * rsample > 1e-5;
+                    filterActive = (rsample * rsample) > 1e-5f;
 
                     // Panning
                     t = std::sin(panFreq * k) * panAmt + 0.5;
@@ -312,12 +330,12 @@ float Player::generate()
                 }
 
                 // Store in stereo channel buffer (needed for the delay effect)
-                chnBuf[k] = lsample | 0;
-                chnBuf[k+1] = rsample | 0;
+                chnBuf[k] = truncate(lsample);
+                chnBuf[k+1] = truncate(rsample);
 
                 // ...and add to stereo mix buffer
-                mMixBuf[k] += lsample | 0;
-                mMixBuf[k+1] += rsample | 0;
+                mMixBuf[k] += truncate(lsample);
+                mMixBuf[k+1] += truncate(rsample);
             }
         }
     }
@@ -385,5 +403,5 @@ std::vector<float> Player::getData(float t, int n)
         d[j] = t > 0 && k < mMixBuf.size() ? mMixBuf[k] / 32768 : 0;
     }
     return d;
-};
+}
 
