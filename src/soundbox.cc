@@ -24,6 +24,17 @@ namespace
     }
 
 
+    int cint(double d)
+    {
+        return static_cast<int>(d);
+    }
+
+    int cint(std::size_t i)
+    {
+        return static_cast<int>(i);
+    }
+
+
     float d2f(double d)
     {
         return static_cast<float>(d);
@@ -126,7 +137,7 @@ namespace
         auto releaseInv = 1.0f / release;
         auto expDecay = -instr.i[ENV_EXP_DECAY] / 16.0f;
         auto arp = instr.i[ARP_CHORD];
-        auto arpInterval = rowLen * std::pow(2, (2 - instr.i[ARP_SPEED]));
+        auto arpInterval = rowLen * cint(std::pow(2, (2 - instr.i[ARP_SPEED])));
 
         auto noteBuf = std::vector<i32>(attack + sustain + release);
 
@@ -135,7 +146,7 @@ namespace
 
         // Local variables.
         int j, j2;
-        float o1t, o2t;
+        float o1t=0.0f, o2t=0.0f;
         float e, rsample;
 
         // Generate one note (attack + sustain + release)
@@ -146,8 +157,8 @@ namespace
                 j2 -= arpInterval;
 
                 // Calculate note frequencies for the oscillators
-                o1t = getnotefreq(n + (arp & 15) + instr.i[OSC1_SEMI] - 128);
-                o2t = getnotefreq(n + (arp & 15) + instr.i[OSC2_SEMI] - 128) * (1.0f + 0.0008f * instr.i[OSC2_DETUNE]);
+                o1t = getnotefreq(n + (arp & 15) + instr.i[OSC1_SEMI] - 1280.f);
+                o2t = getnotefreq(n + (arp & 15) + instr.i[OSC2_SEMI] - 128.0f) * (1.0f + 0.0008f * instr.i[OSC2_DETUNE]);
             }
 
             // Envelope
@@ -213,10 +224,10 @@ float Player::generate()
 {
     // Local variables
     std::optional<int> n;
-    int i, j, b, p, row, col,
-        k, t, lfor, e, x, rowStartSample, da;
+    int i, j, p, row, col,
+        k, rowStartSample;
 
-    float f;
+    float f, t;
 
     // Put performance critical items in local variables
     auto chnBuf = std::vector<i32>(mNumWords);
@@ -253,7 +264,7 @@ float Player::generate()
             // Put performance critical instrument properties in local variables
             auto oscLFO = [&](float f) { return mOscillators(instr.i[LFO_WAVEFORM], f); };
             auto lfoAmt = instr.i[LFO_AMT] / 512.0f;
-            auto lfoFreq = std::pow(2.0f, (instr.i[LFO_FREQ] - 9)) / rowLen;
+            auto lfoFreq = static_cast<float>(std::pow(2.0f, (instr.i[LFO_FREQ] - 9))) / rowLen;
             auto fxLFO = instr.i[LFO_FX_FREQ];
             auto fxFilter = instr.i[FX_FILTER];
             auto fxFreq = instr.i[FX_FREQ] * 43.23529f * 3.141592f / 44100.0f;
@@ -274,7 +285,7 @@ float Player::generate()
                 n = cp ? instr.c[cp.value() - 1].n[row + col * patternLen] : 0;
                 if (n) {
                     const auto& noteBuf = find_or_create(&noteCache, n.value(), [&]{return createNote(instr, n.value(), rowLen, &random_engine); });
-                    for (j = 0, i = rowStartSample * 2; j < noteBuf.size(); j++, i += 2) {
+                    for (j = 0, i = rowStartSample * 2; j < cint(noteBuf.size()); j++, i += 2) {
                         chnBuf[i] += noteBuf[j];
                     }
                 }
@@ -284,7 +295,7 @@ float Player::generate()
             for (j = 0; j < rowLen; j++) {
                 // Dry mono-sample
                 k = (rowStartSample + j) * 2;
-                rsample = chnBuf[k];
+                rsample = static_cast<float>(chnBuf[k]);
 
                 // We only do effects if we have some sound input
                 if (chnBuf[k] != 0 || filterActive) {
@@ -293,7 +304,7 @@ float Player::generate()
                     if (fxLFO) {
                         f *= oscLFO(lfoFreq * k) * lfoAmt + 0.5f;
                     }
-                    f = 1.5 * std::sin(f);
+                    f = 1.5f * std::sin(f);
                     low += f * band;
                     high = q * (rsample - band) - low;
                     band += f * high;
@@ -302,7 +313,7 @@ float Player::generate()
                     // Distortion
                     if (has_dist) {
                         rsample *= dist;
-                        rsample = rsample < 1 ? rsample > -1 ? osc_sin(rsample*.25) : -1 : 1;
+                        rsample = rsample < 1 ? rsample > -1 ? osc_sin(rsample*0.25f) : -1 : 1;
                         rsample /= dist;
                     }
 
@@ -313,7 +324,7 @@ float Player::generate()
                     filterActive = (rsample * rsample) > 1e-5f;
 
                     // Panning
-                    t = std::sin(panFreq * k) * panAmt + 0.5;
+                    t = static_cast<float>(std::sin(panFreq * k)) * panAmt + 0.5f;
                     lsample = rsample * (1 - t);
                     rsample *= t;
                 } else {
@@ -342,7 +353,7 @@ float Player::generate()
 
     // Next iteration. Return progress (1.0 == done!).
     mCurrentCol++;
-    return mCurrentCol / mSong.numChannels;
+    return mCurrentCol / static_cast<float>(mSong.numChannels);
 };
 
 
@@ -396,11 +407,11 @@ std::vector<u8> Player::createWave()
 // Get n samples of wave data at time t [s]. Wave data in range [-2,2].
 std::vector<float> Player::getData(float t, int n)
 {
-    auto i = 2 * std::floor(t * 44100);
+    auto i = cint(2 * std::floor(t * 44100));
     auto d = std::vector<float>(n);
     for (auto j = 0; j < 2*n; j += 1) {
         auto k = i + j;
-        d[j] = t > 0 && k < mMixBuf.size() ? mMixBuf[k] / 32768 : 0;
+        d[j] = t > 0 && k < cint(mMixBuf.size()) ? mMixBuf[k] / 32768.0f : 0.0f;
     }
     return d;
 }

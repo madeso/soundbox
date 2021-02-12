@@ -9,6 +9,6 @@ add_executable(workbench ${src})
 target_link_libraries(
     workbench
     PUBLIC fmt::fmt
-    PRIVATE project_options # project_warnings
+    PRIVATE project_options project_warnings
 )
 source_group("" FILES ${src})
