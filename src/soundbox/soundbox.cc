@@ -1,4 +1,4 @@
-#include "soundbox.h"
+#include "soundbox/soundbox.h"
 
 #include <cmath>
 #include <cassert>
